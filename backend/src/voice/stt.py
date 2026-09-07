@@ -1,7 +1,35 @@
+from __future__ import annotations
+
 from pathlib import Path
 from typing import Any
 
-from faster_whisper import WhisperModel
+try:
+    from faster_whisper import WhisperModel
+
+    _FASTER_WHISPER_AVAILABLE = True
+except ImportError:  # pragma: no cover - exercised on Render without voice deps
+    WhisperModel = None  # type: ignore[misc, assignment]
+    _FASTER_WHISPER_AVAILABLE = False
+
+
+class VoiceUnavailableError(RuntimeError):
+    """Local speech-to-text is not installed or cannot be loaded."""
+
+    def __init__(
+        self,
+        message: str | None = None,
+    ) -> None:
+        super().__init__(
+            message
+            or (
+                "voice speech-to-text is unavailable "
+                "(faster-whisper is not installed)"
+            ),
+        )
+
+
+def is_stt_available() -> bool:
+    return _FASTER_WHISPER_AVAILABLE
 
 
 class LocalSpeechToText:
@@ -21,10 +49,16 @@ class LocalSpeechToText:
         self.model_size = model_size
         self.device = device
         self.compute_type = compute_type
-        self._model: WhisperModel | None = None
+        self._model: Any | None = None
+
+    def _ensure_available(self) -> None:
+        if not _FASTER_WHISPER_AVAILABLE:
+            raise VoiceUnavailableError()
 
     @property
-    def model(self) -> WhisperModel:
+    def model(self) -> Any:
+        self._ensure_available()
+
         if self._model is None:
             self._model = WhisperModel(
                 self.model_size,
@@ -39,6 +73,8 @@ class LocalSpeechToText:
         audio_path: str | Path,
         language: str | None = None,
     ) -> dict[str, Any]:
+        self._ensure_available()
+
         path = Path(audio_path)
 
         if not path.exists():
