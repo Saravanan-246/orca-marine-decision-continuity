@@ -1,7 +1,11 @@
 import axios from "axios";
 
 export const orcaClient = axios.create({
-  baseURL: import.meta.env.VITE_ORCA_API_URL ?? "",
+  baseURL:
+    import.meta.env.VITE_ORCA_API_URL ||
+    (import.meta.env.PROD
+      ? "https://orca-marine-decision-continuity.onrender.com"
+      : ""),
   headers: {
     "Content-Type": "application/json",
   },
