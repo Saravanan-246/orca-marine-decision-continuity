@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<catalog xmlns="http://www.unidata.ucar.edu/namespaces/thredds/InvCatalog/v1.0" version="1.2">
+  <dataset name="OSF_ww3">
+    <dataset name="io_ww3_20250930.nc" ID="OSF15/io_ww3_20250930.nc" urlPath="osf/ww3/io_ww3_20250930.nc"/>
+    <dataset name="rsmc_combined_ww3_20260904.nc" ID="OSF15/rsmc_combined_ww3_20260904.nc" urlPath="osf/ww3/rsmc_combined_ww3_20260904.nc"/>
+    <dataset name="rsmc_combined_ww3_20260905.nc" ID="OSF15/rsmc_combined_ww3_20260905.nc" urlPath="osf/ww3/rsmc_combined_ww3_20260905.nc"/>
+  </dataset>
+</catalog>

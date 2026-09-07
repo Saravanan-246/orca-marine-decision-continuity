@@ -1,0 +1,9 @@
+from datetime import datetime, timezone
+from src.engines.decision_context_engine import DecisionContextEngine
+
+now = datetime(2026, 1, 1, 9, tzinfo=timezone.utc)
+request = {"stakeholder_type":"fisherman", "decision_type":"route", "spatial_scope":{"type":"Point","coordinates":[72,10]}, "segments":[{"segment_id":"SEG-1","label":"departure","start_time":now,"end_time":now.replace(hour=10)},{"segment_id":"SEG-2","label":"fishing","start_time":now.replace(hour=10),"end_time":now.replace(hour=12)},{"segment_id":"SEG-3","label":"return","start_time":now.replace(hour=12),"end_time":now.replace(hour=13)}], "dependencies":[{"dependency_id":"D-WAVE","parameter":"wave_height","value_at_commit":1.4,"valid_range":{"max":2.0},"segment_ids":["SEG-3"]},{"dependency_id":"D-WIND","parameter":"wind_speed","value_at_commit":12,"valid_range":{"max":18},"segment_ids":["SEG-1","SEG-2"]},{"dependency_id":"D-PFZ","parameter":"pfz_validity","value_at_commit":1,"valid_range":{"min":1,"max":1},"segment_ids":["SEG-2"]}], "evidence":[{"evidence_id":"E-WAVE","parameter":"wave_height","source":"demo","value":1.4,"unit":"m","observed_at":now,"data_status":"SIMULATED"},{"evidence_id":"E-WIND","parameter":"wind_speed","source":"demo","value":12,"unit":"kn","observed_at":now,"data_status":"SIMULATED"},{"evidence_id":"E-PFZ","parameter":"pfz_validity","source":"demo","value":1,"observed_at":now,"data_status":"SIMULATED"}]}
+engine = DecisionContextEngine()
+context = engine.create_context(request)
+affected = engine.affected_segments(context, "wave_height", now.replace(hour=12, minute=30), {"type":"Point","coordinates":[72,10]})
+print({"context_id":context.context_id,"affected_dependency":"wave_height","affected_segments":affected,"preserved_segments":[x.segment_id for x in context.segments if x.segment_id not in affected]})

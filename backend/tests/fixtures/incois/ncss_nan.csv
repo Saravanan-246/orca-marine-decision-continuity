@@ -1,0 +1,2 @@
+time,station,latitude[unit="degrees_north"],longitude[unit="degrees_east"],HS[unit=""],UWND[unit=""],VWND[unit=""],T02[unit=""],MWD[unit=""]
+2026-09-06T18:00:00Z,GridPointRequestedAt[15.000N_75.000E],15.000,75.000,NaN,NaN,NaN,NaN,NaN
