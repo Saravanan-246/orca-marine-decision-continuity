@@ -13,8 +13,9 @@ import MarineMap from "../../components/marine/MarineMap";
 import {
   beginNewTripDraft,
   formatTripRoute,
-  readDecision,
+  readCurrentTripDraft,
   readLocalCommitment,
+  tripDraftHasUserInput,
   tripRouteForMap,
 } from "../../lib/orcaSession";
 import {
@@ -65,7 +66,10 @@ function FishermanHome() {
   const { state } = useLatestMarineState();
   const waveLive = marineValueIsLive(state?.wave);
   const windLive = marineValueIsLive(state?.wind);
-  const trip = readLocalCommitment()?.trip ?? readDecision();
+  const draft = readCurrentTripDraft();
+  const trip = tripDraftHasUserInput(draft)
+    ? draft
+    : readLocalCommitment()?.trip ?? null;
   const route = tripRouteForMap(trip);
 
   return (

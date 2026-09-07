@@ -14,8 +14,9 @@ import {
   formatMapLocation,
   formatTripRoute,
   mergeTripDraft,
-  readMapLocation,
+  readCurrentTripDraft,
   readTripDraft,
+  resolveTripFrom,
   syncTripDraftFromMap,
   TRIP_DRAFT_KEY,
   type MapLocation,
@@ -42,7 +43,7 @@ function TripPlanner() {
     setDeparture(draft.departure);
     setReturnTime(draft.returnTime);
     setArea(draft.area);
-    setFromPoint(readMapLocation());
+    setFromPoint(resolveTripFrom());
     setToPoint(draft.to ?? null);
   }, []);
 
@@ -52,7 +53,7 @@ function TripPlanner() {
 
   useEffect(() => {
     const syncFrom = () => {
-      setFromPoint(readMapLocation());
+      setFromPoint(resolveTripFrom());
     };
     window.addEventListener(MAP_LOCATION_EVENT, syncFrom);
     return () => {
@@ -62,24 +63,29 @@ function TripPlanner() {
 
   const saveDraft = (): Trip => {
     const latest = readTripDraft();
-    const from = readMapLocation();
-    const to = toPoint ?? latest?.to ?? null;
+    const from = resolveTripFrom();
+    const to = latest?.to ?? toPoint ?? null;
     const routeArea =
       area.trim() ||
       (from && to ? formatTripRoute({ area: "", from, to }) : "");
-    const saved = mergeTripDraft({
+    const patch: Partial<Trip> = {
       title: title.trim(),
       date,
       departure,
       returnTime,
       area: routeArea,
-      from,
-      to,
-    });
-    setFromPoint(saved.from ?? null);
+    };
+    if (from) {
+      patch.from = from;
+    }
+    if (to) {
+      patch.to = to;
+    }
+    const saved = mergeTripDraft(patch);
+    setFromPoint(resolveTripFrom());
     setToPoint(saved.to ?? null);
-    if (!area.trim() && routeArea) {
-      setArea(routeArea);
+    if (!area.trim() && saved.area) {
+      setArea(saved.area);
     }
     return saved;
   };
@@ -89,17 +95,26 @@ function TripPlanner() {
     setError("");
 
     const latest = readTripDraft();
-    const from = readMapLocation();
-    const to = latest?.to ?? toPoint;
+    const from = resolveTripFrom();
+    const to = latest?.to ?? toPoint ?? null;
 
-    if (
-      !title.trim() ||
-      !date ||
-      !departure ||
-      !returnTime ||
-      !area.trim()
-    ) {
-      setError("Complete the trip details before continuing.");
+    if (!title.trim()) {
+      setError("Trip name is missing.");
+      return;
+    }
+
+    if (!date) {
+      setError("Trip date is missing.");
+      return;
+    }
+
+    if (!departure) {
+      setError("Departure time is missing.");
+      return;
+    }
+
+    if (!returnTime) {
+      setError("Return time is missing.");
       return;
     }
 
@@ -118,18 +133,41 @@ function TripPlanner() {
       return;
     }
 
-    const trip = withTripRouteArea(
-      mergeTripDraft({
-        title: title.trim(),
-        date,
-        departure,
-        returnTime,
-        area: area.trim(),
-        from,
-        to,
-      }),
-    );
-    setFromPoint(trip.from ?? null);
+    const areaValue =
+      area.trim() || formatTripRoute({ area: "", from, to });
+
+    mergeTripDraft({
+      title: title.trim(),
+      date,
+      departure,
+      returnTime,
+      area: areaValue,
+      from,
+      to,
+    });
+
+    const persisted = readCurrentTripDraft();
+    if (
+      !persisted?.date ||
+      !persisted.departure ||
+      !persisted.returnTime ||
+      !persisted.to
+    ) {
+      setError("Trip details could not be saved. Complete the planner and try again.");
+      return;
+    }
+
+    const trip = withTripRouteArea(persisted);
+    mergeTripDraft({
+      title: trip.title,
+      date: trip.date,
+      departure: trip.departure,
+      returnTime: trip.returnTime,
+      area: trip.area,
+      from: trip.from,
+      to: trip.to,
+    });
+    setFromPoint(resolveTripFrom());
     setToPoint(trip.to ?? null);
 
     navigate("/fisherman/decisions", {
@@ -147,7 +185,7 @@ function TripPlanner() {
     setDeparture("");
     setReturnTime("");
     setArea("");
-    setFromPoint(readMapLocation());
+    setFromPoint(resolveTripFrom());
     setToPoint(null);
     setError("");
   };

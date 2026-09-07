@@ -16,10 +16,13 @@ import {
   formatTripRoute,
   mapLocationKey,
   mergeTripDraft,
+  missingTripFieldMessages,
+  readCurrentTripDraft,
   readDecision,
-  readMapLocation,
+  resolveTripFrom,
   saveDecision,
   syncTripDraftFromMap,
+  tripDraftHasUserInput,
   tripHasRequiredRoute,
   type Trip,
   withTripRouteArea,
@@ -70,62 +73,66 @@ function formatTripDate(value: string) {
 }
 
 function loadPersistedTrip(): Trip | null {
-  const draft = syncTripDraftFromMap();
-  const decision = readDecision();
-  const from = readMapLocation() ?? draft.from ?? null;
-  const to = draft.to ?? null;
+  syncTripDraftFromMap();
+  return readCurrentTripDraft();
+}
 
-  if (draft.title || draft.date || draft.departure || draft.returnTime || to) {
-    return withTripRouteArea({
-      ...draft,
-      from,
-      to,
-    });
-  }
-
-  if (decision) {
-    return withTripRouteArea({
-      ...decision,
-      from: readMapLocation() ?? decision.from ?? null,
-      to: draft.to ?? decision.to ?? null,
-    });
-  }
-
-  return null;
+function scheduleLabel(trip: Trip) {
+  const date = formatTripDate(trip.date);
+  const departure = trip.departure.trim() || "Departure not set";
+  const returnTime = trip.returnTime.trim() || "Return not set";
+  return `${date} · ${departure}–${returnTime}`;
 }
 
 function MyDecisions() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [trip, setTrip] = useState<Trip | null>(null);
+  const [trip, setTrip] = useState<Trip | null>(() => loadPersistedTrip());
   const [status, setStatus] = useState<DecisionStatus>("draft");
   const [error, setError] = useState("");
 
   useEffect(() => {
     const loaded = loadPersistedTrip();
-    setTrip(loaded);
+    const visible = tripDraftHasUserInput(loaded) ? loaded : null;
+    setTrip(visible);
     setStatus(
-      loaded
-        ? decisionMatchesDraft(loaded, readDecision())
-          ? "created"
-          : "ready"
-        : "draft",
+      visible && decisionMatchesDraft(visible, readDecision())
+        ? "created"
+        : visible
+          ? "ready"
+          : "draft",
     );
-    setError("");
-  }, [location.key]);
+    const missing = visible ? missingTripFieldMessages(visible) : [];
+    setError(missing.join(" "));
+  }, [location.key, location.pathname]);
 
   const handleCreateDecision = () => {
     setError("");
 
-    const latest = loadPersistedTrip();
-    const source = latest ?? trip;
-    if (!source) {
+    syncTripDraftFromMap();
+    const latest = readCurrentTripDraft();
+    if (!latest || !tripDraftHasUserInput(latest)) {
+      setError("No current trip draft is available.");
       return;
     }
 
-    const from = readMapLocation() ?? source.from ?? null;
-    const normalized = withTripRouteArea({ ...source, from });
+    const from = resolveTripFrom();
+    const to = latest.to ?? null;
+    const source: Trip = {
+      ...latest,
+      from,
+      to,
+    };
+
+    const missing = missingTripFieldMessages(source);
+    if (missing.length > 0) {
+      setError(missing.join(" "));
+      setTrip(source);
+      return;
+    }
+
+    const normalized = withTripRouteArea(source);
 
     if (!tripHasRequiredRoute(normalized)) {
       setError(
@@ -134,12 +141,15 @@ function MyDecisions() {
       return;
     }
 
-    if (!normalized.date || !normalized.departure || !normalized.returnTime) {
-      setError("Complete the trip schedule before creating a decision.");
-      return;
-    }
-
-    mergeTripDraft(normalized);
+    mergeTripDraft({
+      title: normalized.title,
+      date: normalized.date,
+      departure: normalized.departure,
+      returnTime: normalized.returnTime,
+      area: normalized.area,
+      from: normalized.from,
+      to: normalized.to,
+    });
     saveDecision(normalized);
     setTrip(normalized);
     setStatus("created");
@@ -254,7 +264,7 @@ function MyDecisions() {
               <TripDetail
                 icon={<Clock3 size={17} strokeWidth={1.9} />}
                 label="Schedule"
-                value={`${formatTripDate(trip.date)} · ${trip.departure}–${trip.returnTime}`}
+                value={scheduleLabel(trip)}
               />
 
               <TripDetail
@@ -355,7 +365,27 @@ function MyDecisions() {
               {status === "created" ? (
                 <button
                   type="button"
-                  onClick={() => navigate("/fisherman/commitment")}
+                  onClick={() => {
+                    const latest = readCurrentTripDraft();
+                    if (latest?.to && resolveTripFrom()) {
+                      const trip = withTripRouteArea({
+                        ...latest,
+                        from: resolveTripFrom(),
+                        to: latest.to,
+                      });
+                      mergeTripDraft({
+                        title: trip.title,
+                        date: trip.date,
+                        departure: trip.departure,
+                        returnTime: trip.returnTime,
+                        area: trip.area,
+                        from: trip.from,
+                        to: trip.to,
+                      });
+                      saveDecision(trip);
+                    }
+                    navigate("/fisherman/commitment");
+                  }}
                   className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100 sm:w-auto"
                 >
                   Continue

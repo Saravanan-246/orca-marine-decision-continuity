@@ -67,6 +67,7 @@ export function saveMapLocation(lat: number, lon: number): void {
   saveTripDraft({
     ...draft,
     from: payload,
+    to: draft.to ?? null,
   });
 
   window.dispatchEvent(new Event(MAP_LOCATION_EVENT));
@@ -119,26 +120,21 @@ export function parseMapLocationValue(value: unknown): MapLocation | null {
   return { lat, lon };
 }
 
+function asTripString(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
 export function parseTrip(value: unknown): Trip | null {
   if (!value || typeof value !== "object") {
     return null;
   }
   const record = value as Record<string, unknown>;
-  if (
-    typeof record.title !== "string" ||
-    typeof record.date !== "string" ||
-    typeof record.departure !== "string" ||
-    typeof record.returnTime !== "string" ||
-    typeof record.area !== "string"
-  ) {
-    return null;
-  }
   return {
-    title: record.title,
-    date: record.date,
-    departure: record.departure,
-    returnTime: record.returnTime,
-    area: record.area,
+    title: asTripString(record.title),
+    date: asTripString(record.date),
+    departure: asTripString(record.departure),
+    returnTime: asTripString(record.returnTime),
+    area: asTripString(record.area),
     from: parseMapLocationValue(record.from),
     to: parseMapLocationValue(record.to),
   };
@@ -227,13 +223,77 @@ export function resolveTripFrom(
 /** Persist current GPS From into the trip draft without touching To. */
 export function syncTripDraftFromMap(): Trip {
   const current = readTripDraft() ?? emptyTripDraft();
-  const from = readMapLocation();
-  return mergeTripDraft({ from });
+  const from = resolveTripFrom();
+  if (from) {
+    return mergeTripDraft({ from });
+  }
+  return {
+    ...current,
+    from: null,
+    to: current.to ?? null,
+  };
+}
+
+export function tripDraftHasUserInput(trip: Trip | null | undefined): boolean {
+  if (!trip) {
+    return false;
+  }
+  return Boolean(
+    trip.title.trim() ||
+      trip.date.trim() ||
+      trip.departure.trim() ||
+      trip.returnTime.trim() ||
+      trip.area.trim() ||
+      trip.to,
+  );
+}
+
+/** Draft is the only trip source. Live GPS supplies From. Draft supplies To. */
+export function readCurrentTripDraft(): Trip | null {
+  const draft = readTripDraft();
+  if (!draft) {
+    return null;
+  }
+  return {
+    ...draft,
+    from: resolveTripFrom(),
+    to: draft.to ?? null,
+  };
+}
+
+export function missingTripFieldMessages(trip: Trip): string[] {
+  const missing: string[] = [];
+  if (!trip.title.trim()) {
+    missing.push("Trip name is missing.");
+  }
+  if (!trip.date.trim()) {
+    missing.push("Trip date is missing.");
+  }
+  if (!trip.departure.trim()) {
+    missing.push("Departure time is missing.");
+  }
+  if (!trip.returnTime.trim()) {
+    missing.push("Return time is missing.");
+  }
+  if (!resolveTripFrom()) {
+    missing.push("From (current GPS location) is missing.");
+  }
+  if (!trip.to) {
+    missing.push("To (fishing area) is missing.");
+  }
+  if (!trip.area.trim() && !(resolveTripFrom() && trip.to)) {
+    missing.push("Fishing area is missing.");
+  }
+  return missing;
+}
+
+export function clearSavedDecision(): void {
+  localStorage.removeItem(DECISION_KEY);
 }
 
 /** Fresh trip: keep live GPS From only, clear previous To and derived area. */
 export function beginNewTripDraft(): Trip {
-  const from = readMapLocation();
+  const from = resolveTripFrom();
   const next: Trip = {
     ...emptyTripDraft(),
     from,
@@ -241,6 +301,7 @@ export function beginNewTripDraft(): Trip {
     area: "",
   };
   saveTripDraft(next);
+  clearSavedDecision();
   return next;
 }
 
