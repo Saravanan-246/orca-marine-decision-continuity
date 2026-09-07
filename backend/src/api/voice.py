@@ -4,8 +4,9 @@ from typing import Annotated
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
-from src.voice.stt import VoiceUnavailableError
 from src.voice.service import voice_service
+from src.voice.stt import VoiceUnavailableError
+from src.voice.tts import TtsUnavailableError
 
 
 router = APIRouter(tags=["voice"])
@@ -32,6 +33,14 @@ def process_voice_text(
             location=location,
             speak=speak,
         )
+    except (VoiceUnavailableError, TtsUnavailableError) as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "VOICE_UNAVAILABLE",
+                "message": str(exc),
+            },
+        ) from exc
     except (TypeError, ValueError) as exc:
         raise HTTPException(
             status_code=422,
@@ -87,7 +96,7 @@ async def process_voice_audio(
             speak=speak,
         )
 
-    except VoiceUnavailableError as exc:
+    except (VoiceUnavailableError, TtsUnavailableError) as exc:
         raise HTTPException(
             status_code=503,
             detail={
