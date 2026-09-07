@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -14,8 +14,15 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 import {
   formatTripRoute,
-  parseTrip,
+  mergeTripDraft,
+  readDecision,
+  readTripDraft,
+  resolveTripFrom,
+  saveDecision,
+  syncTripDraftFromMap,
+  tripHasRequiredRoute,
   type Trip,
+  withTripRouteArea,
 } from "../../lib/orcaSession";
 
 type LocationState = {
@@ -24,33 +31,6 @@ type LocationState = {
 };
 
 type DecisionStatus = "draft" | "ready" | "created";
-
-const TRIP_STORAGE_KEY = "orca:fisherman:trip-draft";
-const DECISION_STORAGE_KEY = "orca:fisherman:current-decision";
-
-function readStoredTrip(): Trip | null {
-  try {
-    const value = localStorage.getItem(TRIP_STORAGE_KEY);
-    if (!value) {
-      return null;
-    }
-    return parseTrip(JSON.parse(value));
-  } catch {
-    return null;
-  }
-}
-
-function readStoredDecision(): Trip | null {
-  try {
-    const value = localStorage.getItem(DECISION_STORAGE_KEY);
-    if (!value) {
-      return null;
-    }
-    return parseTrip(JSON.parse(value));
-  } catch {
-    return null;
-  }
-}
 
 function formatTripDate(value: string) {
   if (!value) {
@@ -70,36 +50,83 @@ function formatTripDate(value: string) {
   }).format(date);
 }
 
+function loadPersistedTrip(fromNavigation: Trip | null): Trip | null {
+  if (fromNavigation) {
+    const from = resolveTripFrom(fromNavigation.from);
+    const normalized = withTripRouteArea({
+      ...fromNavigation,
+      from,
+    });
+    return mergeTripDraft(normalized);
+  }
+
+  const synced = syncTripDraftFromMap();
+  const draft = readTripDraft();
+  const decision = readDecision();
+
+  if (draft && tripHasRequiredRoute(draft)) {
+    return withTripRouteArea(draft);
+  }
+
+  if (decision) {
+    const from = resolveTripFrom(decision.from);
+    return withTripRouteArea({ ...decision, from });
+  }
+
+  if (draft?.title || draft?.date || draft?.departure || draft?.returnTime) {
+    return withTripRouteArea(synced);
+  }
+
+  return null;
+}
+
 function MyDecisions() {
   const navigate = useNavigate();
   const location = useLocation();
 
   const locationState = (location.state ?? {}) as LocationState;
 
-  const tripFromNavigation = locationState.trip ?? null;
-  const storedTrip = useMemo(() => readStoredTrip(), []);
-  const storedDecision = useMemo(() => readStoredDecision(), []);
+  const [trip, setTrip] = useState<Trip | null>(null);
+  const [status, setStatus] = useState<DecisionStatus>("draft");
+  const [error, setError] = useState("");
 
-  const trip = tripFromNavigation ?? storedTrip ?? storedDecision;
-
-  const [status, setStatus] = useState<DecisionStatus>(
-    storedDecision ? "created" : trip ? "ready" : "draft",
-  );
+  useEffect(() => {
+    const loaded = loadPersistedTrip(locationState.trip ?? null);
+    setTrip(loaded);
+    setStatus(loaded ? (readDecision() ? "created" : "ready") : "draft");
+    setError("");
+  }, [location.key, locationState.trip]);
 
   const handleCreateDecision = () => {
+    setError("");
+
     if (!trip) {
       return;
     }
 
-    localStorage.setItem(
-      DECISION_STORAGE_KEY,
-      JSON.stringify(trip),
-    );
+    const from = resolveTripFrom(trip.from);
+    const normalized = withTripRouteArea({ ...trip, from });
 
+    if (!tripHasRequiredRoute(normalized)) {
+      setError(
+        "Complete the trip route before creating a decision. Select From on the map and choose a fishing area as To.",
+      );
+      return;
+    }
+
+    if (!normalized.date || !normalized.departure || !normalized.returnTime) {
+      setError("Complete the trip schedule before creating a decision.");
+      return;
+    }
+
+    mergeTripDraft(normalized);
+    saveDecision(normalized);
+    setTrip(normalized);
     setStatus("created");
   };
 
   const handleStartTrip = () => {
+    syncTripDraftFromMap();
     navigate("/fisherman/trip");
   };
 
@@ -167,6 +194,15 @@ function MyDecisions() {
         </section>
       ) : (
         <>
+          {error && (
+            <div
+              role="alert"
+              className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700"
+            >
+              {error}
+            </div>
+          )}
+
           {/* Decision summary */}
           <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
             <div className="border-b border-slate-100 px-4 py-4 sm:px-6">

@@ -210,6 +210,36 @@ export function mergeTripDraft(patch: Partial<Trip>): Trip {
   return merged;
 }
 
+export function resolveTripFrom(
+  draftFrom?: MapLocation | null,
+): MapLocation | null {
+  return readMapLocation() ?? draftFrom ?? null;
+}
+
+/** Persist GPS From into the trip draft when the planner or map opens. */
+export function syncTripDraftFromMap(): Trip {
+  const current = readTripDraft() ?? emptyTripDraft();
+  const from = resolveTripFrom(current.from);
+  return mergeTripDraft({ from });
+}
+
+export function withTripRouteArea(trip: Trip): Trip {
+  const from = trip.from ?? null;
+  const to = trip.to ?? null;
+  const area =
+    trip.area.trim() ||
+    (from && to ? formatTripRoute({ area: "", from, to }) : trip.area);
+  return { ...trip, area };
+}
+
+export function tripHasRequiredRoute(trip: Trip | null | undefined): boolean {
+  return Boolean(trip?.from && trip?.to);
+}
+
+export function saveDecision(trip: Trip): void {
+  localStorage.setItem(DECISION_KEY, JSON.stringify(trip));
+}
+
 export function readDecision(): Trip | null {
   try {
     const raw = localStorage.getItem(DECISION_KEY);

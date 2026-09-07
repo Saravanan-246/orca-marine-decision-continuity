@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   CloudSun,
   Compass,
@@ -16,8 +16,9 @@ import {
   formatMapLocation,
   formatTripRoute,
   mergeTripDraft,
-  readMapLocation,
   readTripDraft,
+  resolveTripFrom,
+  syncTripDraftFromMap,
 } from "../../lib/orcaSession";
 import {
   formatMarineValue,
@@ -87,7 +88,7 @@ function FishermanMap() {
   const { state } = useLatestMarineState();
   const waveLive = marineValueIsLive(state?.wave);
   const windLive = marineValueIsLive(state?.wind);
-  const from = readMapLocation();
+  const from = resolveTripFrom(readTripDraft()?.from ?? null);
   const route =
     from && destination
       ? [
@@ -100,25 +101,33 @@ function FishermanMap() {
     (layer) => layer.id === activeLayer,
   );
 
-  const confirmDestination = () => {
-    if (!destination) {
-      return;
-    }
-    const fromPoint = readMapLocation();
+  const persistDestination = (coords: { lat: number; lon: number }) => {
+    const fromPoint = resolveTripFrom(readTripDraft()?.from ?? null);
     const current = readTripDraft();
     const generated = formatTripRoute({
       area: "",
       from: fromPoint,
-      to: destination,
+      to: coords,
     });
     mergeTripDraft({
       from: fromPoint,
-      to: destination,
+      to: coords,
       area:
         current?.area && !current.area.includes("→")
           ? current.area
           : generated,
     });
+  };
+
+  useEffect(() => {
+    syncTripDraftFromMap();
+  }, []);
+
+  const confirmDestination = () => {
+    if (!destination) {
+      return;
+    }
+    persistDestination(destination);
     navigate("/fisherman/trip", { state: { fromMap: true } });
   };
 
@@ -153,7 +162,9 @@ function FishermanMap() {
             }
             selectDestination={selectingDestination}
             onSelectDestination={(coords) => {
-              setDestination({ lat: coords.lat, lon: coords.lng });
+              const next = { lat: coords.lat, lon: coords.lng };
+              setDestination(next);
+              persistDestination(next);
             }}
           />
 

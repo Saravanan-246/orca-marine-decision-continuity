@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -13,59 +13,71 @@ import {
   formatMapLocation,
   formatTripRoute,
   mergeTripDraft,
-  readMapLocation,
-  readTripDraft,
+  resolveTripFrom,
+  syncTripDraftFromMap,
+  TRIP_DRAFT_KEY,
+  type MapLocation,
   type Trip,
+  withTripRouteArea,
 } from "../../lib/orcaSession";
-
-function loadDraft(): Trip {
-  return (
-    readTripDraft() ?? {
-      title: "",
-      date: "",
-      departure: "",
-      returnTime: "",
-      area: "",
-      from: readMapLocation(),
-      to: null,
-    }
-  );
-}
 
 function TripPlanner() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const initialDraft = useMemo(() => loadDraft(), []);
-
-  const [title, setTitle] = useState(initialDraft.title);
-  const [date, setDate] = useState(initialDraft.date);
-  const [departure, setDeparture] = useState(initialDraft.departure);
-  const [returnTime, setReturnTime] = useState(initialDraft.returnTime);
-  const [area, setArea] = useState(initialDraft.area);
-  const fromPoint = readMapLocation() ?? initialDraft.from ?? null;
-  const toPoint = initialDraft.to ?? null;
-
+  const [title, setTitle] = useState("");
+  const [date, setDate] = useState("");
+  const [departure, setDeparture] = useState("");
+  const [returnTime, setReturnTime] = useState("");
+  const [area, setArea] = useState("");
+  const [fromPoint, setFromPoint] = useState<MapLocation | null>(null);
+  const [toPoint, setToPoint] = useState<MapLocation | null>(null);
   const [error, setError] = useState("");
 
-  const isEditingFromMap =
-    Boolean(location.state?.fromMap) && !initialDraft.title;
+  const applyDraft = useCallback((draft: Trip) => {
+    setTitle(draft.title);
+    setDate(draft.date);
+    setDeparture(draft.departure);
+    setReturnTime(draft.returnTime);
+    setArea(draft.area);
+    setFromPoint(resolveTripFrom(draft.from));
+    setToPoint(draft.to ?? null);
+  }, []);
 
-  const saveDraft = () => {
-    mergeTripDraft({
+  useEffect(() => {
+    applyDraft(syncTripDraftFromMap());
+  }, [applyDraft, location.key]);
+
+  const saveDraft = (): Trip => {
+    const from = resolveTripFrom(fromPoint);
+    const routeArea =
+      area.trim() ||
+      (from && toPoint
+        ? formatTripRoute({ area: "", from, to: toPoint })
+        : "");
+    const saved = mergeTripDraft({
       title: title.trim(),
       date,
       departure,
       returnTime,
-      area: area.trim(),
-      from: fromPoint,
+      area: routeArea,
+      from,
       to: toPoint,
     });
+    setFromPoint(saved.from ?? null);
+    setToPoint(saved.to ?? null);
+    if (!area.trim() && routeArea) {
+      setArea(routeArea);
+    }
+    return saved;
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
+
+    const from = resolveTripFrom(fromPoint);
+    const to = toPoint;
 
     if (
       !title.trim() ||
@@ -78,12 +90,12 @@ function TripPlanner() {
       return;
     }
 
-    if (!fromPoint) {
+    if (!from) {
       setError("Current location is required as the trip From point.");
       return;
     }
 
-    if (!toPoint) {
+    if (!to) {
       setError("Select a fishing area on the marine map before continuing.");
       return;
     }
@@ -93,34 +105,32 @@ function TripPlanner() {
       return;
     }
 
-    saveDraft();
+    const trip = withTripRouteArea(saveDraft());
 
     navigate("/fisherman/decisions", {
       state: {
         fromTripPlanner: true,
-        trip: {
-          title: title.trim(),
-          date,
-          departure,
-          returnTime,
-          area: area.trim() || formatTripRoute({ area: "", from: fromPoint, to: toPoint }),
-          from: fromPoint,
-          to: toPoint,
-        },
+        trip,
       },
     });
   };
 
   const clearDraft = () => {
-    localStorage.removeItem("orca:fisherman:trip-draft");
+    localStorage.removeItem(TRIP_DRAFT_KEY);
 
     setTitle("");
     setDate("");
     setDeparture("");
     setReturnTime("");
     setArea("");
+    setFromPoint(resolveTripFrom(null));
+    setToPoint(null);
     setError("");
   };
+
+  const isEditingFromMap = Boolean(
+    (location.state as { fromMap?: boolean } | null)?.fromMap,
+  );
 
   return (
     <section className="mx-auto w-full max-w-2xl">
