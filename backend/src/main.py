@@ -64,6 +64,14 @@ async def unhandled_error(
     )
 
 
+@app.get("/")
+def root() -> dict[str, str]:
+    return {
+        "status": "ok",
+        "service": settings.service_name,
+    }
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {
