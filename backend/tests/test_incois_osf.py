@@ -137,6 +137,16 @@ def test_ocean_provider_can_use_osf_as_live_provider() -> None:
     assert wave.source == "INCOIS-OSF-WW3"
 
 
+def _clear_marine_states() -> None:
+    from src.core.database import db
+
+    collection = db.collection("marine_states")
+    if db.memory:
+        collection.items.clear()
+    else:
+        collection.delete_many({})
+
+
 def test_osf_ingest_route_persists_for_latest(monkeypatch) -> None:
     from uuid import uuid4
 
@@ -174,6 +184,8 @@ def test_osf_ingest_route_persists_for_latest(monkeypatch) -> None:
         "src.integrations.incois_osf.IncoisOsfProvider.build_state",
         lambda self, location: stored,
     )
+
+    _clear_marine_states()
 
     client = TestClient(app)
     ingest = client.post("/marine/state/osf", params={"lat": 15, "lon": 70})

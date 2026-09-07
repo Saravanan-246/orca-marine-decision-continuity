@@ -8,8 +8,19 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
+import { hazardRecords } from "../../lib/roleWorkspace";
+import {
+  formatMarineValue,
+  marineValueIsLive,
+  useLatestMarineState,
+} from "../../lib/useLatestMarineState";
+
 function PublicHome() {
   const navigate = useNavigate();
+  const { state } = useLatestMarineState();
+  const hazards = hazardRecords(state?.hazards);
+  const waveLive = marineValueIsLive(state?.wave);
+  const windLive = marineValueIsLive(state?.wind);
 
   return (
     <section className="space-y-5 sm:space-y-6">
@@ -69,19 +80,25 @@ function PublicHome() {
           <StatusItem
             icon={<Waves size={17} strokeWidth={1.9} />}
             label="Ocean"
-            value="Unavailable"
+            value={formatMarineValue(state?.wave)}
+            live={waveLive}
           />
 
           <StatusItem
             icon={<CloudSun size={17} strokeWidth={1.9} />}
             label="Weather"
-            value="Unavailable"
+            value={formatMarineValue(state?.wind)}
+            live={windLive}
           />
 
           <StatusItem
             icon={<AlertTriangle size={17} strokeWidth={1.9} />}
             label="Warnings"
-            value="No data"
+            value={
+              hazards.length > 0
+                ? "Connected hazard data"
+                : "No connected data"
+            }
           />
         </div>
       </section>
@@ -101,8 +118,9 @@ function PublicHome() {
             </h2>
 
             <p className="mt-1 text-sm leading-6 text-slate-500">
-              Verified public warnings will appear here when an authorized
-              source provides them.
+              {hazards.length > 0
+                ? hazards.map((item) => item.title).join(" · ")
+                : "Verified public warnings will appear here when an authorized source provides them."}
             </p>
 
             <button
@@ -178,10 +196,12 @@ function StatusItem({
   icon,
   label,
   value,
+  live = false,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
+  live?: boolean;
 }) {
   return (
     <div className="px-3 py-4 sm:px-5">
@@ -193,7 +213,12 @@ function StatusItem({
         {label}
       </p>
 
-      <p className="mt-1 text-xs font-semibold text-slate-400">
+      <p
+        className={[
+          "mt-1 text-xs font-semibold",
+          live ? "text-slate-950" : "text-slate-400",
+        ].join(" ")}
+      >
         {value}
       </p>
     </div>

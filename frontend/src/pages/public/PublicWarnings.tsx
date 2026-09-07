@@ -8,6 +8,9 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
+import { hazardRecords } from "../../lib/roleWorkspace";
+import { useLatestMarineState } from "../../lib/useLatestMarineState";
+
 type WarningLevel = "critical" | "warning" | "information";
 
 type PublicWarning = {
@@ -19,7 +22,18 @@ type PublicWarning = {
   issuedAt: string;
 };
 
-const warnings: PublicWarning[] = [];
+function warningFromHazard(
+  item: ReturnType<typeof hazardRecords>[number],
+): PublicWarning {
+  return {
+    id: item.id,
+    title: item.title,
+    description: `${item.area} · ${item.source}`,
+    area: item.area,
+    level: "information",
+    issuedAt: "Time unknown",
+  };
+}
 
 function levelStyles(level: WarningLevel) {
   switch (level) {
@@ -48,6 +62,8 @@ function levelStyles(level: WarningLevel) {
 
 function PublicWarnings() {
   const navigate = useNavigate();
+  const { state, loading, error } = useLatestMarineState();
+  const warnings = hazardRecords(state?.hazards).map(warningFromHazard);
 
   const hasWarnings = warnings.length > 0;
 
@@ -84,6 +100,14 @@ function PublicWarnings() {
           </div>
         </div>
       </header>
+
+      {loading ? (
+        <p className="text-sm text-slate-500">Checking sources…</p>
+      ) : error ? (
+        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </p>
+      ) : null}
 
       {/* Current state */}
       <section

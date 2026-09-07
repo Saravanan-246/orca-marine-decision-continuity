@@ -51,17 +51,24 @@ export function saveMapLocation(lat: number, lon: number): void {
   }
 
   const current = readMapLocation();
-  if (
+  const same =
     current &&
-    mapLocationKey(current.lat, current.lon) === mapLocationKey(lat, lon)
-  ) {
-    return;
-  }
+    mapLocationKey(current.lat, current.lon) === mapLocationKey(lat, lon);
 
   const payload: MapLocation = { lat, lon };
   sessionStorage.setItem(MAP_LOCATION_KEY, JSON.stringify(payload));
-  sessionStorage.removeItem(MARINE_INGEST_KEY);
-  sessionStorage.removeItem(MARINE_INGEST_META_KEY);
+
+  if (!same) {
+    sessionStorage.removeItem(MARINE_INGEST_KEY);
+    sessionStorage.removeItem(MARINE_INGEST_META_KEY);
+  }
+
+  const draft = readTripDraft() ?? emptyTripDraft();
+  saveTripDraft({
+    ...draft,
+    from: payload,
+  });
+
   window.dispatchEvent(new Event(MAP_LOCATION_EVENT));
 }
 
@@ -210,17 +217,90 @@ export function mergeTripDraft(patch: Partial<Trip>): Trip {
   return merged;
 }
 
+/** Live GPS only. Never a fallback center or leftover draft From. */
 export function resolveTripFrom(
-  draftFrom?: MapLocation | null,
+  _draftFrom?: MapLocation | null,
 ): MapLocation | null {
-  return readMapLocation() ?? draftFrom ?? null;
+  return readMapLocation();
 }
 
-/** Persist GPS From into the trip draft when the planner or map opens. */
+/** Persist current GPS From into the trip draft without touching To. */
 export function syncTripDraftFromMap(): Trip {
   const current = readTripDraft() ?? emptyTripDraft();
-  const from = resolveTripFrom(current.from);
+  const from = readMapLocation();
   return mergeTripDraft({ from });
+}
+
+/** Fresh trip: keep live GPS From only, clear previous To and derived area. */
+export function beginNewTripDraft(): Trip {
+  const from = readMapLocation();
+  const next: Trip = {
+    ...emptyTripDraft(),
+    from,
+    to: null,
+    area: "",
+  };
+  saveTripDraft(next);
+  return next;
+}
+
+export function clearTripDestination(): Trip {
+  const current = readTripDraft() ?? emptyTripDraft();
+  const area =
+    current.area.includes("→") || current.area.trim().startsWith("To ")
+      ? ""
+      : current.area;
+  return mergeTripDraft({
+    to: null,
+    area,
+  });
+}
+
+export function persistTripDestination(to: MapLocation): Trip {
+  const from = readMapLocation();
+  const current = readTripDraft() ?? emptyTripDraft();
+  const generated = formatTripRoute({
+    area: "",
+    from,
+    to,
+  });
+  const keepCustomArea =
+    Boolean(current.area.trim()) &&
+    !current.area.includes("→") &&
+    !current.area.trim().startsWith("To ");
+
+  return mergeTripDraft({
+    from,
+    to,
+    area: keepCustomArea ? current.area : generated,
+  });
+}
+
+export type VoiceContext = {
+  role: "FISHERMAN";
+  location: MapLocation | null;
+  tripTitle: string | null;
+  tripRoute: string | null;
+  commitmentId: string | null;
+};
+
+export function buildVoiceContext(): VoiceContext {
+  const commitment = readLocalCommitment();
+  const decision = readDecision();
+  const draft = readTripDraft();
+  const trip = commitment?.trip ?? decision ?? draft;
+  const location =
+    trip?.to ??
+    trip?.from ??
+    readMapLocation();
+
+  return {
+    role: "FISHERMAN",
+    location,
+    tripTitle: trip?.title?.trim() ? trip.title : null,
+    tripRoute: trip ? formatTripRoute(trip) : null,
+    commitmentId: commitment?.id ?? null,
+  };
 }
 
 export function withTripRouteArea(trip: Trip): Trip {

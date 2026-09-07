@@ -19,7 +19,11 @@ import {
   formatTripRoute,
   readDecision,
   readLocalCommitment,
+  resolveTripFrom,
+  saveDecision,
   saveLocalCommitment,
+  tripHasRequiredRoute,
+  withTripRouteArea,
   type LocalCommitment,
   type Trip,
 } from "../../lib/orcaSession";
@@ -121,19 +125,35 @@ function MyCommitments() {
       return;
     }
 
+    const from = resolveTripFrom(decision.from);
+    const trip = withTripRouteArea({ ...decision, from });
+
+    if (!trip.date || !trip.departure || !trip.returnTime) {
+      setError("Complete the trip schedule before creating a commitment.");
+      return;
+    }
+
+    if (!tripHasRequiredRoute(trip)) {
+      setError(
+        "From and fishing area are required. Select your GPS From and a map To before creating a commitment.",
+      );
+      return;
+    }
+
+    saveDecision(trip);
     setBusy(true);
     setError(null);
 
     try {
       const created = await createCommitment(
-        buildCommitmentPayload(decision),
+        buildCommitmentPayload(trip),
       );
 
       try {
         const server = await getCommitment(created.commitment_id);
         const record: LocalCommitment = {
           id: server.commitment_id,
-          trip: decision,
+          trip,
           createdAt: server.created_at,
           status: "active",
         };
@@ -143,7 +163,7 @@ function MyCommitments() {
       } catch (refreshCause) {
         const record: LocalCommitment = {
           id: created.commitment_id,
-          trip: decision,
+          trip,
           createdAt: created.created_at,
           status: "active",
         };

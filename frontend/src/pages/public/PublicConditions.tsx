@@ -160,7 +160,11 @@ function PublicConditions() {
 
           <SourceRow
             label="Public warning source"
-            value="Unavailable"
+            value={
+              state?.hazards && state.hazards.length > 0
+                ? "Marine state"
+                : "Unavailable"
+            }
           />
         </div>
       </section>

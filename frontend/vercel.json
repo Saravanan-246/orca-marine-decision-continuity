@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     {
-      "source": "/((?!assets/|marine/state|commitments|repairs|health|.*\\.[^/]+$).*)",
+      "source": "/((?!assets/).*)",
       "destination": "/index.html"
     }
   ]

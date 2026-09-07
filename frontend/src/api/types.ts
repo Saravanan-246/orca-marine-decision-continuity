@@ -174,3 +174,27 @@ export type MarineState = {
   version?: number;
   last_updated_at?: string;
 };
+
+export type VoiceIntent = {
+  stakeholder_type?: string;
+  decision_type?: string;
+  raw_text?: string;
+  location?: Record<string, unknown> | null;
+};
+
+export type VoiceServiceResponse = {
+  status: string;
+  data_status: string;
+  stakeholder_type: string;
+  decision_type: string;
+  evidence_count: number;
+  summary: string;
+  speech_text: string;
+};
+
+export type VoiceTextResponse = {
+  input_text: string;
+  intent: VoiceIntent;
+  context: Record<string, unknown>;
+  response: VoiceServiceResponse;
+};

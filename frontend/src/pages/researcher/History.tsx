@@ -10,6 +10,12 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
+import {
+  commitmentSummary,
+  monitorStateLabel,
+  readWorkspaceSnapshot,
+} from "../../lib/roleWorkspace";
+
 type HistoryEvent = {
   id: string;
   title: string;
@@ -18,7 +24,42 @@ type HistoryEvent = {
   type: "decision" | "commitment" | "impact" | "repair";
 };
 
-const history: HistoryEvent[] = [];
+function sessionHistory(): HistoryEvent[] {
+  const snapshot = readWorkspaceSnapshot();
+  const events: HistoryEvent[] = [];
+
+  if (snapshot.decision?.title.trim()) {
+    events.push({
+      id: "decision",
+      title: snapshot.decision.title,
+      description: "Stored decision from this session.",
+      time: snapshot.decision.date.trim() || "Time unknown",
+      type: "decision",
+    });
+  }
+
+  if (snapshot.commitment) {
+    events.push({
+      id: snapshot.commitment.id,
+      title: commitmentSummary(snapshot),
+      description: `Commitment ${snapshot.commitment.id}`,
+      time: snapshot.commitment.createdAt || "Time unknown",
+      type: "commitment",
+    });
+  }
+
+  if (snapshot.monitor) {
+    events.push({
+      id: "monitor",
+      title: monitorStateLabel(snapshot),
+      description: "Latest stored monitoring result.",
+      time: "Observed time unknown",
+      type: "impact",
+    });
+  }
+
+  return events;
+}
 
 function eventIcon(type: HistoryEvent["type"]) {
   switch (type) {
@@ -38,6 +79,7 @@ function eventIcon(type: HistoryEvent["type"]) {
 
 function History() {
   const navigate = useNavigate();
+  const history = sessionHistory();
 
   return (
     <section className="mx-auto w-full max-w-4xl space-y-5">

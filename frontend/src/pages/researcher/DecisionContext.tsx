@@ -10,8 +10,20 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
+import {
+  commitmentSummary,
+  locationLabel,
+  monitorStateLabel,
+  readWorkspaceSnapshot,
+} from "../../lib/roleWorkspace";
+
 function DecisionContext() {
   const navigate = useNavigate();
+  const snapshot = readWorkspaceSnapshot();
+  const trip =
+    snapshot.commitment?.trip ?? snapshot.decision ?? snapshot.draft;
+  const title = trip?.title.trim() || "No decision selected";
+  const hasContext = Boolean(trip?.title.trim() || snapshot.commitment);
 
   return (
     <section className="mx-auto w-full max-w-4xl space-y-5">
@@ -61,20 +73,21 @@ function DecisionContext() {
               </p>
 
               <h2 className="mt-1 truncate text-base font-semibold text-slate-950">
-                No decision selected
+                {title}
               </h2>
             </div>
           </div>
 
           <span className="shrink-0 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500">
-            No context
+            {hasContext ? monitorStateLabel(snapshot) : "No context"}
           </span>
         </div>
 
         <div className="px-4 py-5 sm:px-6">
           <p className="text-sm leading-6 text-slate-500">
-            Select an ORCA decision to inspect its supporting evidence,
-            dependencies and marine context.
+            {hasContext
+              ? `${commitmentSummary(snapshot)}. Location: ${locationLabel()}.`
+              : "Select an ORCA decision to inspect its supporting evidence, dependencies and marine context."}
           </p>
 
           <button
@@ -134,10 +147,10 @@ function DecisionContext() {
         </h2>
 
         <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
-          <Lifecycle label="Decision" active />
-          <Lifecycle label="Commitment" />
-          <Lifecycle label="Monitoring" />
-          <Lifecycle label="Impact" />
+          <Lifecycle label="Decision" active={Boolean(snapshot.decision)} />
+          <Lifecycle label="Commitment" active={Boolean(snapshot.commitment)} />
+          <Lifecycle label="Monitoring" active={Boolean(snapshot.monitor)} />
+          <Lifecycle label="Impact" active={Boolean(snapshot.monitor)} />
           <Lifecycle label="Repair" />
         </div>
 

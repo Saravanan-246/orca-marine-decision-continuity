@@ -10,8 +10,19 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
+import { readWorkspaceSnapshot } from "../../lib/roleWorkspace";
+import {
+  marineValueIsLive,
+  useLatestMarineState,
+} from "../../lib/useLatestMarineState";
+
 function ResearcherHome() {
   const navigate = useNavigate();
+  const snapshot = readWorkspaceSnapshot();
+  const { state } = useLatestMarineState();
+  const hasObservations = Boolean(
+    marineValueIsLive(state?.wave) || marineValueIsLive(state?.wind),
+  );
 
   return (
     <section className="space-y-5 sm:space-y-6">
@@ -86,25 +97,31 @@ function ResearcherHome() {
           <OverviewItem
             icon={<FileSearch size={17} strokeWidth={1.9} />}
             label="Evidence"
-            value="No records"
+            value={
+              snapshot.evidence.length > 0 ? "Records present" : "No records"
+            }
           />
 
           <OverviewItem
             icon={<Waves size={17} strokeWidth={1.9} />}
             label="Observations"
-            value="No records"
+            value={hasObservations ? "Records present" : "No records"}
           />
 
           <OverviewItem
             icon={<BarChart3 size={17} strokeWidth={1.9} />}
             label="Changes"
-            value="No records"
+            value={snapshot.monitor ? snapshot.monitor.state : "No records"}
           />
 
           <OverviewItem
             icon={<History size={17} strokeWidth={1.9} />}
             label="History"
-            value="No records"
+            value={
+              snapshot.commitment || snapshot.decision
+                ? "Records present"
+                : "No records"
+            }
           />
         </div>
       </section>

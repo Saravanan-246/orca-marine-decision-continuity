@@ -11,6 +11,15 @@ import {
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { hazardRecords, locationLabel } from "../../lib/roleWorkspace";
+import {
+  formatMarineValue,
+  formatObservedTime,
+  marineSourceLabel,
+  marineValueIsLive,
+  useLatestMarineState,
+} from "../../lib/useLatestMarineState";
+
 type ObservationType =
   | "ocean"
   | "weather"
@@ -27,10 +36,54 @@ type Observation = {
   state: "available" | "unavailable";
 };
 
-const observations: Observation[] = [];
+function marineObservations(
+  state: ReturnType<typeof useLatestMarineState>["state"],
+): Observation[] {
+  const items: Observation[] = [];
+
+  if (marineValueIsLive(state?.wave) && state?.wave) {
+    items.push({
+      id: "wave",
+      type: "ocean",
+      title: `Wave ${formatMarineValue(state.wave)}`,
+      area: locationLabel(),
+      observedAt: formatObservedTime(state.timestamp),
+      source: state.wave.source || marineSourceLabel(state),
+      state: "available",
+    });
+  }
+
+  if (marineValueIsLive(state?.wind) && state?.wind) {
+    items.push({
+      id: "wind",
+      type: "weather",
+      title: `Wind ${formatMarineValue(state.wind)}`,
+      area: locationLabel(),
+      observedAt: formatObservedTime(state.timestamp),
+      source: state.wind.source || marineSourceLabel(state),
+      state: "available",
+    });
+  }
+
+  hazardRecords(state?.hazards).forEach((hazard) => {
+    items.push({
+      id: hazard.id,
+      type: "hazard",
+      title: hazard.title,
+      area: hazard.area,
+      observedAt: formatObservedTime(state?.timestamp),
+      source: hazard.source,
+      state: "available",
+    });
+  });
+
+  return items;
+}
 
 function Observations() {
   const navigate = useNavigate();
+  const { state } = useLatestMarineState();
+  const observations = marineObservations(state);
 
   const [query, setQuery] = useState("");
   const [filter, setFilter] =

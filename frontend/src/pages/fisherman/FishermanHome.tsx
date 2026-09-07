@@ -11,10 +11,10 @@ import { useNavigate } from "react-router-dom";
 
 import MarineMap from "../../components/marine/MarineMap";
 import {
+  beginNewTripDraft,
   formatTripRoute,
   readDecision,
   readLocalCommitment,
-  syncTripDraftFromMap,
   tripRouteForMap,
 } from "../../lib/orcaSession";
 import {
@@ -124,7 +124,7 @@ function FishermanHome() {
           <button
             type="button"
             onClick={() => {
-              syncTripDraftFromMap();
+              beginNewTripDraft();
               navigate("/fisherman/trip");
             }}
             className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100 sm:w-auto"

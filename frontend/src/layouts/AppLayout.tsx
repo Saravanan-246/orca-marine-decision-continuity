@@ -43,12 +43,14 @@ const roleConfig: Record<RoleKey, RoleConfig> = {
   authority: {
     label: "Coastal authority",
     home: "/authority",
+    profile: "/authority/profile",
     showBottomNav: false,
   },
 
   emergency: {
     label: "Emergency responder",
     home: "/emergency",
+    profile: "/emergency/profile",
     showBottomNav: false,
   },
 
@@ -133,7 +135,20 @@ function getPageTitle(pathname: string): string {
   if (pathname === "/operator/profile") return "Profile";
 
   if (pathname === "/authority") return "Coastal overview";
+  if (pathname === "/authority/operations") return "Affected operations";
+  if (pathname === "/authority/hazards") return "Hazards";
+  if (pathname === "/authority/map") return "Coastal map";
+  if (pathname === "/authority/coordination") return "Coordination";
+  if (pathname === "/authority/situations") return "Situations";
+  if (pathname === "/authority/profile") return "Profile";
+
   if (pathname === "/emergency") return "Emergency overview";
+  if (pathname === "/emergency/alerts") return "Alerts";
+  if (pathname === "/emergency/map") return "Emergency map";
+  if (pathname === "/emergency/incidents") return "Incidents";
+  if (pathname.startsWith("/emergency/incidents/")) return "Incident details";
+  if (pathname === "/emergency/response") return "Response";
+  if (pathname === "/emergency/profile") return "Profile";
 
   if (pathname === "/researcher") return "Research";
   if (pathname === "/researcher/evidence") return "Evidence";
@@ -275,7 +290,13 @@ function AppLayout() {
                       ? "/operator/alerts"
                       : role === "public"
                         ? "/public/warnings"
-                        : config.home,
+                        : role === "authority"
+                          ? "/authority/hazards"
+                          : role === "emergency"
+                            ? "/emergency/alerts"
+                            : role === "researcher"
+                              ? "/researcher/evidence"
+                              : config.home,
                 )}
                 aria-label="Open alerts or activity"
                 className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-4 focus:ring-blue-100"

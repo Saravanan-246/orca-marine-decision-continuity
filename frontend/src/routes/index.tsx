@@ -55,6 +55,28 @@ import PublicWarnings from "../pages/public/PublicWarnings";
 import PublicProfile from "../pages/public/PublicProfile";
 
 /* =========================================================
+   AUTHORITY
+========================================================= */
+import AuthorityHome from "../pages/authority/AuthorityHome";
+import AffectedOperations from "../pages/authority/AffectedOperations";
+import AuthorityHazards from "../pages/authority/AuthorityHazards";
+import CoastalMap from "../pages/authority/CoastalMap";
+import Coordination from "../pages/authority/Coordination";
+import Situations from "../pages/authority/Situations";
+import AuthorityProfile from "../pages/authority/AuthorityProfile";
+
+/* =========================================================
+   EMERGENCY
+========================================================= */
+import EmergencyHome from "../pages/emergency/EmergencyHome";
+import EmergencyAlerts from "../pages/emergency/EmergencyAlerts";
+import EmergencyMap from "../pages/emergency/EmergencyMap";
+import Incidents from "../pages/emergency/Incidents";
+import IncidentDetails from "../pages/emergency/IncidentDetails";
+import Response from "../pages/emergency/Response";
+import EmergencyProfile from "../pages/emergency/EmergencyProfile";
+
+/* =========================================================
    SHARED ORCA LIFECYCLE
 ========================================================= */
 import Decisions from "../pages/decisions/Decisions";
@@ -76,40 +98,6 @@ import Ocean from "../pages/marine/Ocean";
 import PFZ from "../pages/marine/PFZ";
 import Hazards from "../pages/marine/Hazards";
 import MarineRoutes from "../pages/marine/Routes";
-
-/* =========================================================
-   TEMPORARY ROLE PLACEHOLDER
-========================================================= */
-function RoleComingSoon({
-  role,
-}: {
-  role: string;
-}) {
-  return (
-    <section className="mx-auto w-full max-w-2xl">
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center sm:p-8">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-          <span className="text-lg font-semibold">
-            O
-          </span>
-        </div>
-
-        <p className="mt-5 text-xs font-semibold uppercase tracking-[0.14em] text-blue-600">
-          ORCA
-        </p>
-
-        <h1 className="mt-2 text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl">
-          {role} experience
-        </h1>
-
-        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
-          This stakeholder workspace is part of the ORCA architecture and will
-          be connected here as its dedicated experience is completed.
-        </p>
-      </div>
-    </section>
-  );
-}
 
 function AppRoutes() {
   return (
@@ -227,7 +215,37 @@ function AppRoutes() {
         --------------------------------------------------- */}
         <Route
           path="/authority"
-          element={<RoleComingSoon role="Coastal authority" />}
+          element={<AuthorityHome />}
+        />
+
+        <Route
+          path="/authority/operations"
+          element={<AffectedOperations />}
+        />
+
+        <Route
+          path="/authority/hazards"
+          element={<AuthorityHazards />}
+        />
+
+        <Route
+          path="/authority/map"
+          element={<CoastalMap />}
+        />
+
+        <Route
+          path="/authority/coordination"
+          element={<Coordination />}
+        />
+
+        <Route
+          path="/authority/situations"
+          element={<Situations />}
+        />
+
+        <Route
+          path="/authority/profile"
+          element={<AuthorityProfile />}
         />
 
         {/* ---------------------------------------------------
@@ -235,9 +253,37 @@ function AppRoutes() {
         --------------------------------------------------- */}
         <Route
           path="/emergency"
-          element={
-            <RoleComingSoon role="Emergency responder" />
-          }
+          element={<EmergencyHome />}
+        />
+
+        <Route
+          path="/emergency/alerts"
+          element={<EmergencyAlerts />}
+        />
+
+        <Route
+          path="/emergency/map"
+          element={<EmergencyMap />}
+        />
+
+        <Route
+          path="/emergency/incidents"
+          element={<Incidents />}
+        />
+
+        <Route
+          path="/emergency/incidents/:id"
+          element={<IncidentDetails />}
+        />
+
+        <Route
+          path="/emergency/response"
+          element={<Response />}
+        />
+
+        <Route
+          path="/emergency/profile"
+          element={<EmergencyProfile />}
         />
 
         {/* ---------------------------------------------------

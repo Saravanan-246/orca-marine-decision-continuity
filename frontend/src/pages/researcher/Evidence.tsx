@@ -1,6 +1,5 @@
 import {
   ArrowLeft,
-  CalendarDays,
   CheckCircle2,
   FileSearch,
   MapPinned,
@@ -9,6 +8,9 @@ import {
   Waves,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+
+import { readWorkspaceSnapshot } from "../../lib/roleWorkspace";
+import type { Evidence as OrcaEvidence } from "../../api/types";
 
 type EvidenceState =
   | "available"
@@ -23,10 +25,25 @@ type EvidenceItem = {
   state: EvidenceState;
 };
 
-const evidence: EvidenceItem[] = [];
+function toEvidenceItem(record: OrcaEvidence): EvidenceItem {
+  const status = record.data_status;
+  return {
+    id: record.evidence_id,
+    title: record.parameter,
+    type: record.parameter,
+    source: record.source,
+    state:
+      status === "UNKNOWN"
+        ? "unknown"
+        : status === "REAL" || status === "SIMULATED" || status === "ASSUMED"
+          ? "available"
+          : "unavailable",
+  };
+}
 
 function Evidence() {
   const navigate = useNavigate();
+  const evidence = readWorkspaceSnapshot().evidence.map(toEvidenceItem);
 
   const available = evidence.filter(
     (item) => item.state === "available",
@@ -68,14 +85,20 @@ function Evidence() {
 
       {/* Summary */}
       <section className="grid grid-cols-3 gap-3">
-        <Summary label="Records" value={evidence.length} />
-        <Summary label="Available" value={available} />
+        <Summary
+          label="Records"
+          value={evidence.length > 0 ? String(evidence.length) : "None"}
+        />
+        <Summary
+          label="Available"
+          value={available > 0 ? String(available) : "None"}
+        />
         <Summary
           label="Unknown"
           value={
-            evidence.filter(
-              (item) => item.state === "unknown",
-            ).length
+            evidence.some((item) => item.state === "unknown")
+              ? "Present"
+              : "None"
           }
         />
       </section>
@@ -185,7 +208,7 @@ function Summary({
   value,
 }: {
   label: string;
-  value: number;
+  value: string;
 }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">

@@ -1,9 +1,9 @@
 import {
-  Activity,
   Compass,
   FileText,
   Home,
-  UserRound,
+  Mic,
+  ShieldCheck,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -20,24 +20,24 @@ const navItems: NavItem[] = [
     icon: Home,
   },
   {
+    label: "Map",
+    path: "/fisherman/map",
+    icon: Compass,
+  },
+  {
     label: "Decisions",
     path: "/fisherman/decisions",
     icon: FileText,
   },
   {
-    label: "Marine",
-    path: "/fisherman/map",
-    icon: Compass,
+    label: "Commitments",
+    path: "/fisherman/commitment",
+    icon: ShieldCheck,
   },
   {
-    label: "Activity",
-    path: "/fisherman/activity",
-    icon: Activity,
-  },
-  {
-    label: "Profile",
-    path: "/fisherman/profile",
-    icon: UserRound,
+    label: "Voice",
+    path: "/fisherman/voice",
+    icon: Mic,
   },
 ];
 
@@ -46,10 +46,7 @@ function isActive(pathname: string, itemPath: string) {
     return pathname === "/fisherman";
   }
 
-  return (
-    pathname === itemPath ||
-    pathname.startsWith(`${itemPath}/`)
-  );
+  return pathname === itemPath || pathname.startsWith(`${itemPath}/`);
 }
 
 function BottomNav() {
@@ -71,7 +68,7 @@ function BottomNav() {
       "
     >
       <div className="mx-auto w-full max-w-7xl">
-        <div className="grid h-[72px] grid-cols-5 px-2">
+        <div className="grid h-[72px] grid-cols-5 px-1 sm:px-2">
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(location.pathname, item.path);

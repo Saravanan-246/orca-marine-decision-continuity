@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CloudSun,
   Compass,
@@ -14,12 +14,11 @@ import { useLocation, useNavigate } from "react-router-dom";
 import MarineMap from "../../components/marine/MarineMap";
 import {
   formatMapLocation,
-  formatTripRoute,
-  mergeTripDraft,
+  persistTripDestination,
   readTripDraft,
-  resolveTripFrom,
   syncTripDraftFromMap,
 } from "../../lib/orcaSession";
+import { useLiveGpsLocation } from "../../lib/useLiveGpsLocation";
 import {
   formatMarineValue,
   marineValueIsLive,
@@ -38,6 +37,10 @@ type Layer = {
   id: LayerId;
   label: string;
   icon: typeof Waves;
+};
+
+type MapNavigationState = {
+  fromTripPlanner?: boolean;
 };
 
 const layers: Layer[] = [
@@ -76,52 +79,45 @@ const layers: Layer[] = [
 function FishermanMap() {
   const navigate = useNavigate();
   const location = useLocation();
-  const selectingDestination = Boolean(
-    (location.state as { fromTripPlanner?: boolean } | null)?.fromTripPlanner,
-  );
+  const navState = (location.state ?? {}) as MapNavigationState;
+  const selectingDestination = Boolean(navState.fromTripPlanner);
 
   const [activeLayer, setActiveLayer] = useState<LayerId | null>(null);
   const [showLayers, setShowLayers] = useState(false);
-  const [destination, setDestination] = useState(
-    () => readTripDraft()?.to ?? null,
-  );
+  const [destination, setDestination] = useState<{
+    lat: number;
+    lon: number;
+  } | null>(null);
+  const from = useLiveGpsLocation();
   const { state } = useLatestMarineState();
   const waveLive = marineValueIsLive(state?.wave);
   const windLive = marineValueIsLive(state?.wind);
-  const from = resolveTripFrom(readTripDraft()?.from ?? null);
-  const route =
-    from && destination
-      ? [
-          { lat: from.lat, lng: from.lon },
-          { lat: destination.lat, lng: destination.lon },
-        ]
-      : undefined;
-
-  const selectedLayer = layers.find(
-    (layer) => layer.id === activeLayer,
-  );
-
-  const persistDestination = (coords: { lat: number; lon: number }) => {
-    const fromPoint = resolveTripFrom(readTripDraft()?.from ?? null);
-    const current = readTripDraft();
-    const generated = formatTripRoute({
-      area: "",
-      from: fromPoint,
-      to: coords,
-    });
-    mergeTripDraft({
-      from: fromPoint,
-      to: coords,
-      area:
-        current?.area && !current.area.includes("→")
-          ? current.area
-          : generated,
-    });
-  };
 
   useEffect(() => {
     syncTripDraftFromMap();
-  }, []);
+    setDestination(readTripDraft()?.to ?? null);
+  }, [location.key]);
+
+  const persistDestination = useCallback(
+    (coords: { lat: number; lon: number }) => {
+      setDestination(coords);
+      persistTripDestination(coords);
+    },
+    [],
+  );
+
+  const route = useMemo(
+    () =>
+      from && destination
+        ? [
+            { lat: from.lat, lng: from.lon },
+            { lat: destination.lat, lng: destination.lon },
+          ]
+        : undefined,
+    [destination, from],
+  );
+
+  const selectedLayer = layers.find((layer) => layer.id === activeLayer);
 
   const confirmDestination = () => {
     if (!destination) {
@@ -141,8 +137,15 @@ function FishermanMap() {
           </p>
 
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">
-            Explore the sea
+            {selectingDestination ? "Choose fishing area" : "Explore the sea"}
           </h1>
+
+          {selectingDestination && (
+            <p className="mt-1 text-sm text-slate-500">
+              Tap the map to set your destination. Your current location is the
+              trip From point.
+            </p>
+          )}
         </div>
 
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
@@ -161,10 +164,9 @@ function FishermanMap() {
                 : null
             }
             selectDestination={selectingDestination}
+            tripPlanning={selectingDestination || Boolean(destination)}
             onSelectDestination={(coords) => {
-              const next = { lat: coords.lat, lon: coords.lng };
-              setDestination(next);
-              persistDestination(next);
+              persistDestination({ lat: coords.lat, lon: coords.lng });
             }}
           />
 
@@ -199,9 +201,7 @@ function FishermanMap() {
                           key={layer.id}
                           type="button"
                           onClick={() =>
-                            setActiveLayer(
-                              selected ? null : layer.id,
-                            )
+                            setActiveLayer(selected ? null : layer.id)
                           }
                           className={[
                             "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition",
@@ -210,15 +210,8 @@ function FishermanMap() {
                               : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
                           ].join(" ")}
                         >
-                          <Icon
-                            size={16}
-                            strokeWidth={1.9}
-                          />
-
-                          <span className="flex-1">
-                            {layer.label}
-                          </span>
-
+                          <Icon size={16} strokeWidth={1.9} />
+                          <span className="flex-1">{layer.label}</span>
                           {selected && (
                             <span className="h-2 w-2 rounded-full bg-blue-600" />
                           )}
@@ -235,14 +228,12 @@ function FishermanMap() {
         {/* Map information bar */}
         <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 sm:px-5">
           <div className="min-w-0">
-            <p className="text-xs font-medium text-slate-400">
-              MAP VIEW
-            </p>
+            <p className="text-xs font-medium text-slate-400">MAP VIEW</p>
 
             <p className="mt-0.5 truncate text-sm font-medium text-slate-800">
               {selectingDestination
                 ? destination
-                  ? `To ${formatMapLocation(destination)}`
+                  ? `Fishing area: ${formatMapLocation(destination)}`
                   : "Tap the map to set fishing area"
                 : selectedLayer
                   ? `${selectedLayer.label} layer selected`
@@ -252,7 +243,7 @@ function FishermanMap() {
 
           <div className="flex shrink-0 items-center gap-2 text-xs text-slate-400">
             <LocateFixed size={14} strokeWidth={1.9} />
-            <span>Location</span>
+            <span>{from ? "From set" : "From pending"}</span>
           </div>
         </div>
       </div>
@@ -299,22 +290,34 @@ function FishermanMap() {
             <Navigation size={17} strokeWidth={1.9} />
           </div>
 
-          <div>
+          <div className="min-w-0 flex-1">
             <h2 className="text-sm font-semibold text-slate-900">
               Trip context
             </h2>
 
-            <p className="mt-1 text-sm leading-6 text-slate-500">
-              From: {formatMapLocation(from)}. To:{" "}
-              {formatMapLocation(destination)}.
-            </p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <ContextChip
+                label="Your location"
+                value={formatMapLocation(from)}
+                tone="from"
+              />
+              <ContextChip
+                label="Fishing area"
+                value={
+                  destination
+                    ? formatMapLocation(destination)
+                    : "Not selected"
+                }
+                tone="to"
+              />
+            </div>
 
             {selectingDestination && (
               <button
                 type="button"
                 disabled={!destination}
                 onClick={confirmDestination}
-                className="mt-3 inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60"
+                className="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
               >
                 Use this fishing area
               </button>
@@ -345,9 +348,7 @@ function SnapshotItem({
         {icon}
       </div>
 
-      <p className="mt-3 text-xs font-medium text-slate-500">
-        {label}
-      </p>
+      <p className="mt-3 text-xs font-medium text-slate-500">{label}</p>
 
       <p
         className={[
@@ -355,6 +356,32 @@ function SnapshotItem({
           live ? "text-slate-950" : "text-slate-400",
         ].join(" ")}
       >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function ContextChip({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "from" | "to";
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+      <p
+        className={[
+          "text-[11px] font-semibold uppercase tracking-wide",
+          tone === "from" ? "text-blue-600" : "text-teal-700",
+        ].join(" ")}
+      >
+        {label}
+      </p>
+      <p className="mt-1 break-words text-sm font-medium text-slate-800">
         {value}
       </p>
     </div>

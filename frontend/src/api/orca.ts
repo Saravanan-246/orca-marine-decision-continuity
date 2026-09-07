@@ -6,6 +6,7 @@ import type {
   MarineState,
   ReevaluateResponse,
   RepairProposal,
+  VoiceTextResponse,
 } from "./types";
 
 function commitmentPath(commitmentId: string, suffix = ""): string {
@@ -117,4 +118,36 @@ export async function getLatestMarineState(): Promise<MarineState | null> {
     }
     throw error;
   }
+}
+
+export async function processVoiceText(params: {
+  text: string;
+  latitude?: number;
+  longitude?: number;
+  speak?: boolean;
+}): Promise<VoiceTextResponse> {
+  const form = new FormData();
+  form.append("text", params.text);
+  form.append("speak", String(params.speak ?? false));
+
+  if (
+    params.latitude !== undefined &&
+    params.longitude !== undefined &&
+    Number.isFinite(params.latitude) &&
+    Number.isFinite(params.longitude)
+  ) {
+    form.append("latitude", String(params.latitude));
+    form.append("longitude", String(params.longitude));
+  }
+
+  const response = await orcaClient.post<VoiceTextResponse>(
+    "/voice/text",
+    form,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    },
+  );
+  return response.data;
 }

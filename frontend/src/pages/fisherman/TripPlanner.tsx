@@ -10,10 +10,12 @@ import {
 import { useLocation, useNavigate } from "react-router-dom";
 
 import {
+  MAP_LOCATION_EVENT,
   formatMapLocation,
   formatTripRoute,
   mergeTripDraft,
-  resolveTripFrom,
+  readMapLocation,
+  readTripDraft,
   syncTripDraftFromMap,
   TRIP_DRAFT_KEY,
   type MapLocation,
@@ -40,7 +42,7 @@ function TripPlanner() {
     setDeparture(draft.departure);
     setReturnTime(draft.returnTime);
     setArea(draft.area);
-    setFromPoint(resolveTripFrom(draft.from));
+    setFromPoint(readMapLocation());
     setToPoint(draft.to ?? null);
   }, []);
 
@@ -48,13 +50,23 @@ function TripPlanner() {
     applyDraft(syncTripDraftFromMap());
   }, [applyDraft, location.key]);
 
+  useEffect(() => {
+    const syncFrom = () => {
+      setFromPoint(readMapLocation());
+    };
+    window.addEventListener(MAP_LOCATION_EVENT, syncFrom);
+    return () => {
+      window.removeEventListener(MAP_LOCATION_EVENT, syncFrom);
+    };
+  }, []);
+
   const saveDraft = (): Trip => {
-    const from = resolveTripFrom(fromPoint);
+    const latest = readTripDraft();
+    const from = readMapLocation();
+    const to = toPoint ?? latest?.to ?? null;
     const routeArea =
       area.trim() ||
-      (from && toPoint
-        ? formatTripRoute({ area: "", from, to: toPoint })
-        : "");
+      (from && to ? formatTripRoute({ area: "", from, to }) : "");
     const saved = mergeTripDraft({
       title: title.trim(),
       date,
@@ -62,7 +74,7 @@ function TripPlanner() {
       returnTime,
       area: routeArea,
       from,
-      to: toPoint,
+      to,
     });
     setFromPoint(saved.from ?? null);
     setToPoint(saved.to ?? null);
@@ -76,8 +88,9 @@ function TripPlanner() {
     event.preventDefault();
     setError("");
 
-    const from = resolveTripFrom(fromPoint);
-    const to = toPoint;
+    const latest = readTripDraft();
+    const from = readMapLocation();
+    const to = latest?.to ?? toPoint;
 
     if (
       !title.trim() ||
@@ -105,12 +118,23 @@ function TripPlanner() {
       return;
     }
 
-    const trip = withTripRouteArea(saveDraft());
+    const trip = withTripRouteArea(
+      mergeTripDraft({
+        title: title.trim(),
+        date,
+        departure,
+        returnTime,
+        area: area.trim(),
+        from,
+        to,
+      }),
+    );
+    setFromPoint(trip.from ?? null);
+    setToPoint(trip.to ?? null);
 
     navigate("/fisherman/decisions", {
       state: {
         fromTripPlanner: true,
-        trip,
       },
     });
   };
@@ -123,7 +147,7 @@ function TripPlanner() {
     setDeparture("");
     setReturnTime("");
     setArea("");
-    setFromPoint(resolveTripFrom(null));
+    setFromPoint(readMapLocation());
     setToPoint(null);
     setError("");
   };

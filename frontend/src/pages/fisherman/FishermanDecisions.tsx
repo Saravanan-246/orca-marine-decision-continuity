@@ -14,10 +14,10 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 import {
   formatTripRoute,
+  mapLocationKey,
   mergeTripDraft,
   readDecision,
-  readTripDraft,
-  resolveTripFrom,
+  readMapLocation,
   saveDecision,
   syncTripDraftFromMap,
   tripHasRequiredRoute,
@@ -25,12 +25,31 @@ import {
   withTripRouteArea,
 } from "../../lib/orcaSession";
 
-type LocationState = {
-  fromTripPlanner?: boolean;
-  trip?: Trip;
-};
-
 type DecisionStatus = "draft" | "ready" | "created";
+
+function samePoint(
+  left?: { lat: number; lon: number } | null,
+  right?: { lat: number; lon: number } | null,
+) {
+  if (!left || !right) {
+    return !left && !right;
+  }
+  return mapLocationKey(left.lat, left.lon) === mapLocationKey(right.lat, right.lon);
+}
+
+function decisionMatchesDraft(draft: Trip, decision: Trip | null): boolean {
+  if (!decision) {
+    return false;
+  }
+  return (
+    decision.title === draft.title &&
+    decision.date === draft.date &&
+    decision.departure === draft.departure &&
+    decision.returnTime === draft.returnTime &&
+    samePoint(decision.from, draft.from) &&
+    samePoint(decision.to, draft.to)
+  );
+}
 
 function formatTripDate(value: string) {
   if (!value) {
@@ -50,31 +69,26 @@ function formatTripDate(value: string) {
   }).format(date);
 }
 
-function loadPersistedTrip(fromNavigation: Trip | null): Trip | null {
-  if (fromNavigation) {
-    const from = resolveTripFrom(fromNavigation.from);
-    const normalized = withTripRouteArea({
-      ...fromNavigation,
-      from,
-    });
-    return mergeTripDraft(normalized);
-  }
-
-  const synced = syncTripDraftFromMap();
-  const draft = readTripDraft();
+function loadPersistedTrip(): Trip | null {
+  const draft = syncTripDraftFromMap();
   const decision = readDecision();
+  const from = readMapLocation() ?? draft.from ?? null;
+  const to = draft.to ?? null;
 
-  if (draft && tripHasRequiredRoute(draft)) {
-    return withTripRouteArea(draft);
+  if (draft.title || draft.date || draft.departure || draft.returnTime || to) {
+    return withTripRouteArea({
+      ...draft,
+      from,
+      to,
+    });
   }
 
   if (decision) {
-    const from = resolveTripFrom(decision.from);
-    return withTripRouteArea({ ...decision, from });
-  }
-
-  if (draft?.title || draft?.date || draft?.departure || draft?.returnTime) {
-    return withTripRouteArea(synced);
+    return withTripRouteArea({
+      ...decision,
+      from: readMapLocation() ?? decision.from ?? null,
+      to: draft.to ?? decision.to ?? null,
+    });
   }
 
   return null;
@@ -84,28 +98,34 @@ function MyDecisions() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const locationState = (location.state ?? {}) as LocationState;
-
   const [trip, setTrip] = useState<Trip | null>(null);
   const [status, setStatus] = useState<DecisionStatus>("draft");
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const loaded = loadPersistedTrip(locationState.trip ?? null);
+    const loaded = loadPersistedTrip();
     setTrip(loaded);
-    setStatus(loaded ? (readDecision() ? "created" : "ready") : "draft");
+    setStatus(
+      loaded
+        ? decisionMatchesDraft(loaded, readDecision())
+          ? "created"
+          : "ready"
+        : "draft",
+    );
     setError("");
-  }, [location.key, locationState.trip]);
+  }, [location.key]);
 
   const handleCreateDecision = () => {
     setError("");
 
-    if (!trip) {
+    const latest = loadPersistedTrip();
+    const source = latest ?? trip;
+    if (!source) {
       return;
     }
 
-    const from = resolveTripFrom(trip.from);
-    const normalized = withTripRouteArea({ ...trip, from });
+    const from = readMapLocation() ?? source.from ?? null;
+    const normalized = withTripRouteArea({ ...source, from });
 
     if (!tripHasRequiredRoute(normalized)) {
       setError(
