@@ -14,10 +14,8 @@ class MemoryCollection:
 
     def insert_one(self, document: dict[str, Any]) -> None:
         key = str(document["_id"])
-
         if key in self.items:
             raise ValueError(f"Duplicate _id: {key}")
-
         self.items[key] = document.copy()
 
     def find_one(
@@ -27,7 +25,6 @@ class MemoryCollection:
         for item in self.items.values():
             if self._matches(item, query):
                 return item.copy()
-
         return None
 
     def find(
@@ -35,7 +32,6 @@ class MemoryCollection:
         query: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         query = query or {}
-
         return [
             item.copy()
             for item in self.items.values()
@@ -80,6 +76,7 @@ class MemoryCollection:
                         value is None or value >= expected
                     ):
                         return False
+
             elif value != condition:
                 return False
 
@@ -92,7 +89,6 @@ class Database:
         self.db: Any = None
         self.memory = False
         self.collections: dict[str, Any] = {}
-
         self.connect()
 
     def connect(self) -> None:
@@ -101,7 +97,8 @@ class Database:
         try:
             client = MongoClient(
                 settings.mongo_uri,
-                serverSelectionTimeoutMS=700,
+                serverSelectionTimeoutMS=10000,
+                connectTimeoutMS=10000,
             )
 
             client.admin.command("ping")
